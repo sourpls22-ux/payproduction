@@ -1579,8 +1579,8 @@ app.post('/api/webhooks/atlos', async (req, res) => {
     console.log('Found signature:', signature)
     
     // 4. Проверяем флаг для отключения проверки подписи (для тестирования)
-    if (process.env.ATLOS_SIGNATURE_MODE === 'off') {
-      console.log('⚠️ Signature verification disabled for testing')
+    if (process.env.ATLOS_SIGNATURE_MODE === 'off' || process.env.NODE_ENV === 'development') {
+      console.log('⚠️ Signature verification disabled for testing/development')
     } else {
       // 5. Проверяем подпись
       if (!signature) {
