@@ -1598,9 +1598,10 @@ app.post('/api/webhooks/atlos', async (req, res) => {
       const payload = timestamp ? `${timestamp}.${rawBody}` : rawBody
       console.log('Payload for signature:', payload)
       
-      // 8. Проверяем подпись в разных форматах
-      const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
-      hmac.update(payload)
+      // 8. Проверяем подпись (исправлено: декодируем API Secret из base64)
+      const key = Buffer.from(ATLOS_API_SECRET, 'base64') // Декодируем base64
+      const hmac = crypto.createHmac('sha256', key)
+      hmac.update(payload, 'utf8')
       
       const expectedSignatureBase64 = hmac.digest('base64')
       const expectedSignatureHex = hmac.digest('hex')
@@ -1608,11 +1609,12 @@ app.post('/api/webhooks/atlos', async (req, res) => {
       console.log('Expected signature (base64):', expectedSignatureBase64)
       console.log('Expected signature (hex):', expectedSignatureHex)
       
-      // 9. Сравниваем подписи (простое сравнение строк)
-      const isValidBase64 = signature === expectedSignatureBase64
-      const isValidHex = signature === expectedSignatureHex
+      // 9. Безопасное сравнение подписей
+      const a = Buffer.from(signature)
+      const b = Buffer.from(expectedSignatureBase64)
+      const isValid = a.length === b.length && crypto.timingSafeEqual(a, b)
       
-      if (!isValidBase64 && !isValidHex) {
+      if (!isValid) {
         console.error('Invalid webhook signature')
         console.error('Received:', signature)
         console.error('Expected (base64):', expectedSignatureBase64)
