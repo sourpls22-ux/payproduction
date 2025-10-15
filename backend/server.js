@@ -1582,13 +1582,13 @@ app.post('/api/webhooks/atlos', (req, res) => {
       // return res.status(401).json({ error: 'Invalid signature' })
     }
 
-    const { orderId, status, amount, currency } = req.body
+    const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = req.body
 
     console.log('Atlos webhook received:', { orderId, status, amount, currency })
     console.log('Full webhook body:', JSON.stringify(req.body, null, 2))
     console.log('Webhook headers:', JSON.stringify(req.headers, null, 2))
 
-    if (status === 'completed' || status === 'confirmed') {
+    if (status === 100 || status === 'completed' || status === 'confirmed') {
       // Update payment status
       db.run(
         'UPDATE payments SET status = ? WHERE payment_id = ?',
