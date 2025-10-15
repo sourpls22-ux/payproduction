@@ -383,7 +383,7 @@ const createAtlosPayment = async (amount, userId) => {
     
     // Create payment data for Atlos
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-    const webhookUrl = process.env.BACKEND_URL || 'http://localhost:5000'
+    const webhookUrl = process.env.BACKEND_URL || 'https://kissblow.me'
     
     const paymentData = {
       merchantId: ATLOS_MERCHANT_ID,
