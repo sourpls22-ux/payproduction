@@ -1569,8 +1569,9 @@ app.post('/api/webhooks/atlos', (req, res) => {
     console.log('Request body:', JSON.stringify(req.body))
 
     const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
-    hmac.update(JSON.stringify(req.body))
-    const expectedSignature = hmac.digest('base64')  // Используем base64 как в документации ATLOS
+    hmac.write(JSON.stringify(req.body))
+    hmac.end()
+    const expectedSignature = hmac.read().toString('base64')  // Используем write/read как в документации ATLOS
     console.log('Expected signature:', expectedSignature)
 
     if (signature !== expectedSignature) {
