@@ -1570,16 +1570,14 @@ app.post('/api/webhooks/atlos', (req, res) => {
 
     const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
     hmac.update(JSON.stringify(req.body))
-    const expectedSignature = hmac.digest('hex')
+    const expectedSignature = hmac.digest('base64')  // Используем base64 как в документации ATLOS
     console.log('Expected signature:', expectedSignature)
 
-    // Temporarily disable signature verification for debugging
     if (signature !== expectedSignature) {
       console.error('Invalid webhook signature')
       console.error('Received:', signature)
       console.error('Expected:', expectedSignature)
-      console.log('⚠️  SIGNATURE VERIFICATION DISABLED FOR DEBUGGING - PROCEEDING ANYWAY')
-      // return res.status(401).json({ error: 'Invalid signature' })
+      return res.status(401).json({ error: 'Invalid signature' })
     }
 
     const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = req.body
