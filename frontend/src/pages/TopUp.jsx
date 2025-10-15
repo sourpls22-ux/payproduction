@@ -9,25 +9,38 @@ import SEOHead from '../components/SEOHead'
 const TopUp = () => {
   const [amount, setAmount] = useState('')
   const [selectedQuickAmount, setSelectedQuickAmount] = useState(null)
+  const [isProcessing, setIsProcessing] = useState(false)
   const { t } = useTranslation()
   const { error } = useToast()
   
-  // Глобальная обработка ошибок Atlos для localhost
+  // Глобальная обработка ошибок Atlos WebSocket
   useEffect(() => {
     const handleAtlosError = (event) => {
       if (event.error && event.error.message && 
-          event.error.message.includes('Cannot send data if the connection is not in the \'Connected\' State')) {
-        console.warn('Atlos WebSocket error (normal for localhost):', event.error)
+          (event.error.message.includes('Cannot send data if the connection is not in the \'Connected\' State') ||
+           event.error.message.includes('WebSocket connection') ||
+           event.error.message.includes('atlos'))) {
+        console.warn('Atlos WebSocket error (handled):', event.error.message)
+        event.preventDefault() // Предотвращаем показ ошибки в консоли
+      }
+    }
+    
+    const handleUnhandledRejection = (event) => {
+      if (event.reason && event.reason.message && 
+          (event.reason.message.includes('Cannot send data if the connection is not in the \'Connected\' State') ||
+           event.reason.message.includes('WebSocket connection') ||
+           event.reason.message.includes('atlos'))) {
+        console.warn('Atlos WebSocket promise rejection (handled):', event.reason.message)
         event.preventDefault() // Предотвращаем показ ошибки в консоли
       }
     }
     
     window.addEventListener('error', handleAtlosError)
-    window.addEventListener('unhandledrejection', handleAtlosError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
     
     return () => {
       window.removeEventListener('error', handleAtlosError)
-      window.removeEventListener('unhandledrejection', handleAtlosError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
     }
   }, [])
   
@@ -60,15 +73,28 @@ const TopUp = () => {
         try {
           if (window.atlos && window.atlos.Pay) {
             console.log(`Attempting Atlos.Pay (attempt ${attempt + 1}/${retries + 1})`)
-            window.atlos.Pay(paymentData)
-            resolve(true)
+            
+            // Добавляем задержку для стабилизации WebSocket соединения
+            setTimeout(() => {
+              try {
+                window.atlos.Pay(paymentData)
+                resolve(true)
+              } catch (innerError) {
+                console.warn(`Atlos.Pay failed (attempt ${attempt + 1}/${retries + 1}):`, innerError)
+                if (attempt < retries) {
+                  setTimeout(() => attemptCall(attempt + 1), 2000) // Увеличиваем задержку
+                } else {
+                  reject(innerError)
+                }
+              }
+            }, 1500) // Задержка 1.5 секунды для стабилизации соединения
           } else {
             throw new Error('Atlos not available')
           }
         } catch (error) {
           console.warn(`Atlos call failed (attempt ${attempt + 1}/${retries + 1}):`, error)
           if (attempt < retries) {
-            setTimeout(() => attemptCall(attempt + 1), 1000)
+            setTimeout(() => attemptCall(attempt + 1), 2000)
           } else {
             reject(error)
           }
@@ -122,6 +148,8 @@ const TopUp = () => {
       return
     }
     
+    setIsProcessing(true)
+    
     try {
       const finalAmount = getFinalAmount()
       const response = await axios.post('/api/topup', {
@@ -140,7 +168,7 @@ const TopUp = () => {
         if (atlosReady) {
           try {
             console.log('Atlos is ready, calling Atlos.Pay with data:', response.data.payment_data)
-            // Добавляем небольшую задержку для полной загрузки Atlos
+            // Увеличиваем задержку для полной стабилизации WebSocket соединения
             setTimeout(async () => {
               try {
                 await callAtlosWithRetry(response.data.payment_data)
@@ -150,9 +178,9 @@ const TopUp = () => {
                 console.log('Falling back to direct URL:', response.data.payment_url)
                 window.open(response.data.payment_url, '_blank')
               }
-            }, 500)
+            }, 2000) // Увеличиваем задержку до 2 секунд
           } catch (atlosError) {
-            console.warn('Atlos widget error (normal for localhost):', atlosError)
+            console.warn('Atlos widget error:', atlosError)
             // Fallback to direct URL if Atlos widget fails
             console.log('Falling back to direct URL:', response.data.payment_url)
             window.open(response.data.payment_url, '_blank')
@@ -169,6 +197,8 @@ const TopUp = () => {
     } catch (err) {
       console.error('Top up error:', err)
       error('Payment creation failed. Please try again.')
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -296,10 +326,17 @@ const TopUp = () => {
               {/* Кнопка пополнения */}
               <button
                 onClick={handleTopUp}
-                disabled={!amount || amount < 1}
-                className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                disabled={!amount || amount < 1 || isProcessing}
+                className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
               >
-                {t('topUp.topUpButton')}
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  t('topUp.topUpButton')
+                )}
               </button>
 
               {/* Дополнительная информация */}
