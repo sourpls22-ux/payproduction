@@ -65,42 +65,121 @@ const TopUp = () => {
       }
     })
   }
+
+  // Функция для проверки состояния WebSocket соединения ATLOS
+  const checkAtlosConnection = () => {
+    return new Promise((resolve) => {
+      if (!window.atlos) {
+        resolve(false)
+        return
+      }
+      
+      // Проверяем различные состояния соединения
+      const checkConnection = () => {
+        try {
+          // Пытаемся получить состояние соединения
+          if (window.atlos._connection && window.atlos._connection.readyState === 1) {
+            console.log('ATLOS WebSocket connection is ready (1)')
+            resolve(true)
+          } else if (window.atlos._ws && window.atlos._ws.readyState === 1) {
+            console.log('ATLOS WebSocket connection is ready (2)')
+            resolve(true)
+          } else if (window.atlos._connection || window.atlos._ws) {
+            console.log('ATLOS WebSocket connection not ready, waiting...')
+            setTimeout(checkConnection, 500)
+          } else {
+            // Если не можем найти объекты соединения, считаем что готово
+            console.log('ATLOS WebSocket objects not found, assuming ready')
+            resolve(true)
+          }
+        } catch (error) {
+          console.warn('Error checking ATLOS connection:', error)
+          resolve(false)
+        }
+      }
+      
+      // Начинаем проверку через 1 секунду
+      setTimeout(checkConnection, 1000)
+      
+      // Таймаут через 10 секунд
+      setTimeout(() => {
+        console.log('ATLOS connection check timeout')
+        resolve(false)
+      }, 10000)
+    })
+  }
   
-  // Функция для вызова Atlos с повторными попытками
+  // Функция для вызова Atlos с проверкой соединения
   const callAtlosWithRetry = (paymentData, retries = 3) => {
-    return new Promise((resolve, reject) => {
-      const attemptCall = (attempt) => {
+    return new Promise(async (resolve, reject) => {
+      const attemptCall = async (attempt) => {
         try {
           if (window.atlos && window.atlos.Pay) {
             console.log(`Attempting Atlos.Pay (attempt ${attempt + 1}/${retries + 1})`)
             
-            // Добавляем задержку для стабилизации WebSocket соединения
-            setTimeout(() => {
+            // Проверяем состояние соединения
+            const isConnected = await checkAtlosConnection()
+            
+            if (isConnected) {
               try {
+                console.log('ATLOS connection verified, calling Pay method')
                 window.atlos.Pay(paymentData)
                 resolve(true)
               } catch (innerError) {
                 console.warn(`Atlos.Pay failed (attempt ${attempt + 1}/${retries + 1}):`, innerError)
                 if (attempt < retries) {
-                  setTimeout(() => attemptCall(attempt + 1), 2000) // Увеличиваем задержку
+                  setTimeout(() => attemptCall(attempt + 1), 3000) // Увеличиваем задержку
                 } else {
                   reject(innerError)
                 }
               }
-            }, 1500) // Задержка 1.5 секунды для стабилизации соединения
+            } else {
+              console.warn(`Atlos connection not ready (attempt ${attempt + 1}/${retries + 1})`)
+              if (attempt < retries) {
+                setTimeout(() => attemptCall(attempt + 1), 3000)
+              } else {
+                reject(new Error('Atlos connection not ready after retries'))
+              }
+            }
           } else {
             throw new Error('Atlos not available')
           }
         } catch (error) {
           console.warn(`Atlos call failed (attempt ${attempt + 1}/${retries + 1}):`, error)
           if (attempt < retries) {
-            setTimeout(() => attemptCall(attempt + 1), 2000)
+            setTimeout(() => attemptCall(attempt + 1), 3000)
           } else {
             reject(error)
           }
         }
       }
       attemptCall(0)
+    })
+  }
+
+  // Функция для принудительного переподключения ATLOS
+  const forceAtlosReconnect = () => {
+    return new Promise((resolve) => {
+      if (window.atlos && window.atlos._connection) {
+        try {
+          // Закрываем существующее соединение
+          if (window.atlos._connection.close) {
+            window.atlos._connection.close()
+          }
+          if (window.atlos._ws && window.atlos._ws.close) {
+            window.atlos._ws.close()
+          }
+          console.log('ATLOS connection closed for reconnection')
+        } catch (error) {
+          console.warn('Error closing ATLOS connection:', error)
+        }
+      }
+      
+      // Ждем переподключения
+      setTimeout(() => {
+        console.log('ATLOS reconnection delay completed')
+        resolve(true)
+      }, 2000)
     })
   }
   
@@ -168,7 +247,10 @@ const TopUp = () => {
         if (atlosReady) {
           try {
             console.log('Atlos is ready, calling Atlos.Pay with data:', response.data.payment_data)
-            // Увеличиваем задержку для полной стабилизации WebSocket соединения
+            
+            // Принудительно переподключаемся для стабильности
+            await forceAtlosReconnect()
+            
             setTimeout(async () => {
               try {
                 await callAtlosWithRetry(response.data.payment_data)
@@ -178,7 +260,7 @@ const TopUp = () => {
                 console.log('Falling back to direct URL:', response.data.payment_url)
                 window.open(response.data.payment_url, '_blank')
               }
-            }, 2000) // Увеличиваем задержку до 2 секунд
+            }, 3000) // Увеличиваем задержку до 3 секунд
           } catch (atlosError) {
             console.warn('Atlos widget error:', atlosError)
             // Fallback to direct URL if Atlos widget fails
