@@ -66,7 +66,7 @@ const TopUp = () => {
     })
   }
 
-  // Функция для проверки состояния WebSocket соединения ATLOS
+  // Функция для проверки состояния WebSocket соединения ATLOS (оптимизированная)
   const checkAtlosConnection = () => {
     return new Promise((resolve) => {
       if (!window.atlos) {
@@ -86,7 +86,7 @@ const TopUp = () => {
             resolve(true)
           } else if (window.atlos._connection || window.atlos._ws) {
             console.log('ATLOS WebSocket connection not ready, waiting...')
-            setTimeout(checkConnection, 500)
+            setTimeout(checkConnection, 200) // Уменьшаем с 500ms до 200ms
           } else {
             // Если не можем найти объекты соединения, считаем что готово
             console.log('ATLOS WebSocket objects not found, assuming ready')
@@ -98,19 +98,19 @@ const TopUp = () => {
         }
       }
       
-      // Начинаем проверку через 1 секунду
-      setTimeout(checkConnection, 1000)
+      // Начинаем проверку сразу (убираем задержку в 1 секунду)
+      checkConnection()
       
-      // Таймаут через 10 секунд
+      // Таймаут через 3 секунды (уменьшаем с 10 секунд)
       setTimeout(() => {
         console.log('ATLOS connection check timeout')
         resolve(false)
-      }, 10000)
+      }, 3000)
     })
   }
   
-  // Функция для вызова Atlos с проверкой соединения
-  const callAtlosWithRetry = (paymentData, retries = 3) => {
+  // Функция для вызова Atlos с проверкой соединения (оптимизированная)
+  const callAtlosWithRetry = (paymentData, retries = 2) => { // Уменьшаем попытки с 3 до 2
     return new Promise(async (resolve, reject) => {
       const attemptCall = async (attempt) => {
         try {
@@ -128,7 +128,7 @@ const TopUp = () => {
               } catch (innerError) {
                 console.warn(`Atlos.Pay failed (attempt ${attempt + 1}/${retries + 1}):`, innerError)
                 if (attempt < retries) {
-                  setTimeout(() => attemptCall(attempt + 1), 3000) // Увеличиваем задержку
+                  setTimeout(() => attemptCall(attempt + 1), 1000) // Уменьшаем с 3000ms до 1000ms
                 } else {
                   reject(innerError)
                 }
@@ -136,7 +136,7 @@ const TopUp = () => {
             } else {
               console.warn(`Atlos connection not ready (attempt ${attempt + 1}/${retries + 1})`)
               if (attempt < retries) {
-                setTimeout(() => attemptCall(attempt + 1), 3000)
+                setTimeout(() => attemptCall(attempt + 1), 1000) // Уменьшаем с 3000ms до 1000ms
               } else {
                 reject(new Error('Atlos connection not ready after retries'))
               }
@@ -147,7 +147,7 @@ const TopUp = () => {
         } catch (error) {
           console.warn(`Atlos call failed (attempt ${attempt + 1}/${retries + 1}):`, error)
           if (attempt < retries) {
-            setTimeout(() => attemptCall(attempt + 1), 3000)
+            setTimeout(() => attemptCall(attempt + 1), 1000) // Уменьшаем с 3000ms до 1000ms
           } else {
             reject(error)
           }
@@ -157,7 +157,7 @@ const TopUp = () => {
     })
   }
 
-  // Функция для принудительного переподключения ATLOS
+  // Функция для принудительного переподключения ATLOS (оптимизированная)
   const forceAtlosReconnect = () => {
     return new Promise((resolve) => {
       if (window.atlos && window.atlos._connection) {
@@ -175,11 +175,11 @@ const TopUp = () => {
         }
       }
       
-      // Ждем переподключения
+      // Ждем переподключения (уменьшаем с 2000ms до 500ms)
       setTimeout(() => {
         console.log('ATLOS reconnection delay completed')
         resolve(true)
-      }, 2000)
+      }, 500)
     })
   }
   
@@ -260,7 +260,7 @@ const TopUp = () => {
                 console.log('Falling back to direct URL:', response.data.payment_url)
                 window.open(response.data.payment_url, '_blank')
               }
-            }, 3000) // Увеличиваем задержку до 3 секунд
+            }, 1000) // Уменьшаем с 3000ms до 1000ms
           } catch (atlosError) {
             console.warn('Atlos widget error:', atlosError)
             // Fallback to direct URL if Atlos widget fails
