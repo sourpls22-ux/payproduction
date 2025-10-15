@@ -1561,32 +1561,85 @@ app.post('/api/test-webhook/:orderId', authenticateToken, (req, res) => {
 })
 
 // Webhook for Atlos notifications
-app.post('/api/webhooks/atlos', (req, res) => {
+app.post('/api/webhooks/atlos', async (req, res) => {
   try {
-    // Verify webhook signature
-    const signature = req.headers['signature'] || req.headers['Signature']
-    console.log('Received signature:', signature)
-    console.log('Request body:', JSON.stringify(req.body))
-
-    const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
-    hmac.write(JSON.stringify(req.body))
-    hmac.end()
-    const expectedSignature = hmac.read().toString('base64')  // Используем write/read как в документации ATLOS
-    console.log('Expected signature:', expectedSignature)
-
-    if (signature !== expectedSignature) {
-      console.error('Invalid webhook signature')
-      console.error('Received:', signature)
-      console.error('Expected:', expectedSignature)
-      return res.status(401).json({ error: 'Invalid signature' })
+    // 1. Читаем сырое тело запроса
+    const rawBody = await req.text()
+    console.log('Raw body:', rawBody)
+    
+    // 2. Логируем все заголовки для отладки
+    console.log('All headers:', JSON.stringify(req.headers, null, 2))
+    
+    // 3. Ищем подпись в разных возможных заголовках
+    const signature = req.headers['x-atlos-signature'] || 
+                     req.headers['x-signature'] || 
+                     req.headers['signature'] || 
+                     req.headers['Signature']
+    
+    console.log('Found signature:', signature)
+    
+    // 4. Проверяем флаг для отключения проверки подписи (для тестирования)
+    if (process.env.ATLOS_SIGNATURE_MODE === 'off') {
+      console.log('⚠️ Signature verification disabled for testing')
+    } else {
+      // 5. Проверяем подпись
+      if (!signature) {
+        console.error('No signature found in headers')
+        return res.status(401).json({ error: 'No signature provided' })
+      }
+      
+      // 6. Получаем timestamp если есть
+      const timestamp = req.headers['x-atlos-timestamp'] || req.headers['timestamp']
+      
+      // 7. Создаем строку для подписи
+      const payload = timestamp ? `${timestamp}.${rawBody}` : rawBody
+      console.log('Payload for signature:', payload)
+      
+      // 8. Проверяем подпись в разных форматах
+      const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
+      hmac.update(payload)
+      
+      const expectedSignatureBase64 = hmac.digest('base64')
+      const expectedSignatureHex = hmac.digest('hex')
+      
+      console.log('Expected signature (base64):', expectedSignatureBase64)
+      console.log('Expected signature (hex):', expectedSignatureHex)
+      
+      // 9. Сравниваем с константным временем
+      const isValidBase64 = crypto.timingSafeEqual(
+        Buffer.from(signature, 'base64'),
+        Buffer.from(expectedSignatureBase64, 'base64')
+      )
+      
+      const isValidHex = crypto.timingSafeEqual(
+        Buffer.from(signature, 'hex'),
+        Buffer.from(expectedSignatureHex, 'hex')
+      )
+      
+      if (!isValidBase64 && !isValidHex) {
+        console.error('Invalid webhook signature')
+        console.error('Received:', signature)
+        console.error('Expected (base64):', expectedSignatureBase64)
+        console.error('Expected (hex):', expectedSignatureHex)
+        return res.status(401).json({ error: 'Invalid signature' })
+      }
+      
+      console.log('✅ Signature verified successfully')
     }
-
-    const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = req.body
-
+    
+    // 10. Парсим JSON только после проверки подписи
+    let webhookData
+    try {
+      webhookData = JSON.parse(rawBody)
+    } catch (parseError) {
+      console.error('Failed to parse JSON:', parseError)
+      return res.status(400).json({ error: 'Invalid JSON' })
+    }
+    
+    const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = webhookData
+    
     console.log('Atlos webhook received:', { orderId, status, amount, currency })
-    console.log('Full webhook body:', JSON.stringify(req.body, null, 2))
-    console.log('Webhook headers:', JSON.stringify(req.headers, null, 2))
-
+    
     if (status === 100 || status === 'completed' || status === 'confirmed') {
       // Update payment status
       db.run(
@@ -1597,7 +1650,7 @@ app.post('/api/webhooks/atlos', (req, res) => {
             console.error('Payment update error:', err)
             return res.status(500).json({ error: 'Database error' })
           }
-
+          
           // Update user balance
           console.log(`Looking up payment with orderId: ${orderId}`)
           db.get(
@@ -1608,10 +1661,10 @@ app.post('/api/webhooks/atlos', (req, res) => {
                 console.error('Payment lookup error:', err)
                 return res.status(500).json({ error: 'Database error' })
               }
-
+              
               console.log('Payment found:', payment)
               if (payment) {
-                const creditAmount = payment.credit_amount || amount // Fallback to amount if credit_amount is null
+                const creditAmount = payment.credit_amount || amount
                 console.log(`Updating balance for user ${payment.user_id} with amount: ${creditAmount}`)
                 db.run(
                   'UPDATE users SET balance = balance + ? WHERE id = ?',
@@ -1621,7 +1674,7 @@ app.post('/api/webhooks/atlos', (req, res) => {
                       console.error('Balance update error:', err)
                       return res.status(500).json({ error: 'Database error' })
                     }
-
+                    
                     console.log(`✅ Balance updated for user ${payment.user_id}: +$${creditAmount} (paid: $${amount})`)
                   }
                 )
@@ -1646,7 +1699,7 @@ app.post('/api/webhooks/atlos', (req, res) => {
         }
       )
     }
-
+    
     res.json({ status: 'ok' })
   } catch (error) {
     console.error('Webhook error:', error)
