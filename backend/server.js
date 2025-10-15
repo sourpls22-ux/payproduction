@@ -1564,13 +1564,19 @@ app.post('/api/test-webhook/:orderId', authenticateToken, (req, res) => {
 app.post('/api/webhooks/atlos', (req, res) => {
   try {
     // Verify webhook signature
-    const signature = req.headers['signature']
+    const signature = req.headers['signature'] || req.headers['Signature']
+    console.log('Received signature:', signature)
+    console.log('Request body:', JSON.stringify(req.body))
+
     const hmac = crypto.createHmac('sha256', ATLOS_API_SECRET)
     hmac.update(JSON.stringify(req.body))
     const expectedSignature = hmac.digest('hex')
+    console.log('Expected signature:', expectedSignature)
 
     if (signature !== expectedSignature) {
       console.error('Invalid webhook signature')
+      console.error('Received:', signature)
+      console.error('Expected:', expectedSignature)
       return res.status(401).json({ error: 'Invalid signature' })
     }
 
