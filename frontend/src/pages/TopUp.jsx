@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Bitcoin } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useTranslation } from '../hooks/useTranslation'
@@ -187,7 +187,8 @@ const TopUp = () => {
   const quickAmounts = [
     { amount: 10, discount: 0, bonus: 0, label: '$10', description: 'No bonus' },
     { amount: 50, discount: 5, bonus: 2.5, label: '$50', description: '5% bonus' },
-    { amount: 100, discount: 10, bonus: 10, label: '$100', description: '10% bonus' }
+    { amount: 100, discount: 10, bonus: 10, label: '$100', description: '10% bonus' },
+    { amount: 200, discount: 15, bonus: 30, label: '$200', description: '15% bonus' }
   ]
   
   // Только криптовалюта, убираем выбор метода
@@ -294,7 +295,7 @@ const TopUp = () => {
     <>
       <SEOHead {...seoData} />
       <div className="min-h-screen theme-bg py-8">
-      <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-8">
               <Link
                 to="/dashboard"
@@ -308,55 +309,176 @@ const TopUp = () => {
             </div>
 
         <div className="theme-surface rounded-lg p-6 border theme-border">
-              {/* Способ оплаты - только криптовалюта */}
-              <div className="mb-6">
-                <h3 className="theme-text font-semibold mb-4">{t('topUp.paymentMethod')}</h3>
-                <div className="p-4 rounded-lg border-2 border-onlyfans-accent bg-blue-500 bg-opacity-10">
-                  <div className="flex items-center space-x-3">
-                    <Bitcoin size={24} className="text-onlyfans-accent" />
-                    <div className="text-left">
-                      <div className="theme-text font-semibold">{t('topUp.usdtTron')}</div>
-                      <div className="theme-text-secondary text-sm">{t('topUp.fastAnonymous')}</div>
-                    </div>
-                  </div>
-                </div>
-                <p className="theme-text-secondary text-sm mt-2">
-                  {t('topUp.cryptoOnly')}
-                </p>
-              </div>
 
           {/* Быстрое пополнение */}
           <div className="mb-6">
             <h3 className="theme-text font-semibold mb-4">Quick Top-Up</h3>
-            <div className="grid grid-cols-1 gap-3">
-              {quickAmounts.map((quickAmount) => (
-                <button
-                  key={quickAmount.amount}
-                  onClick={() => handleQuickAmountSelect(quickAmount)}
-                  className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    selectedQuickAmount?.amount === quickAmount.amount
-                      ? 'border-onlyfans-accent bg-blue-500 bg-opacity-10'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-onlyfans-accent hover:bg-blue-500 hover:bg-opacity-5'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="theme-text font-semibold text-lg">{quickAmount.label}</div>
-                      <div className="theme-text-secondary text-sm">{quickAmount.description}</div>
-                    </div>
-                    <div className="text-right">
-                      {quickAmount.bonus > 0 && (
-                        <div className="text-green-500 font-semibold text-sm">
-                          +${quickAmount.bonus} bonus
-                        </div>
-                      )}
-                      <div className="theme-text-secondary text-sm">
-                        Pay: ${(quickAmount.amount - quickAmount.bonus).toFixed(2)}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Первый ряд: $10 и $50 */}
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[0])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[0].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[0].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[0].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[0].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">{quickAmounts[0].label}</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[0].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[0].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[0].bonus} bonus
                       </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Pay: ${(quickAmounts[0].amount - quickAmounts[0].bonus).toFixed(2)}
                     </div>
                   </div>
-                </button>
-              ))}
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[1])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[1].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[1].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[1].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[1].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">{quickAmounts[1].label}</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[1].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[1].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[1].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Pay: ${(quickAmounts[1].amount - quickAmounts[1].bonus).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </button>
+              
+              {/* Второй ряд: $100 и $200 */}
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[2])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[2].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[2].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[2].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[2].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">{quickAmounts[2].label}</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[2].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[2].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[2].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Pay: ${(quickAmounts[2].amount - quickAmounts[2].bonus).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[3])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[3].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[3].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[3].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[3].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">{quickAmounts[3].label}</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[3].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[3].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[3].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Pay: ${(quickAmounts[3].amount - quickAmounts[3].bonus).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
 
