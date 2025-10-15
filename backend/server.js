@@ -2213,7 +2213,7 @@ app.listen(PORT, () => {
   console.log(`Atlos integration configured:`)
   console.log(`- Merchant ID: ${ATLOS_MERCHANT_ID}`)
   console.log(`- API Secret: ${ATLOS_API_SECRET.substring(0, 8)}...`)
-  console.log(`- Webhook URL: http://localhost:${PORT}/api/webhooks/atlos`)
+  console.log(`- Webhook URL: ${process.env.BACKEND_URL || 'https://kissblow.me'}/api/webhooks/atlos`)
   console.log('Atlos integration is ready for crypto payments!')
   
   // Check for expired boosts every hour
