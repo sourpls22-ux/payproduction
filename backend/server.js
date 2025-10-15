@@ -1563,8 +1563,8 @@ app.post('/api/test-webhook/:orderId', authenticateToken, (req, res) => {
 // Webhook for Atlos notifications
 app.post('/api/webhooks/atlos', async (req, res) => {
   try {
-    // 1. Читаем сырое тело запроса
-    const rawBody = await req.text()
+    // 1. Получаем сырое тело запроса (в Express это req.body)
+    const rawBody = JSON.stringify(req.body)
     console.log('Raw body:', rawBody)
     
     // 2. Логируем все заголовки для отладки
@@ -1627,15 +1627,8 @@ app.post('/api/webhooks/atlos', async (req, res) => {
       console.log('✅ Signature verified successfully')
     }
     
-    // 10. Парсим JSON только после проверки подписи
-    let webhookData
-    try {
-      webhookData = JSON.parse(rawBody)
-    } catch (parseError) {
-      console.error('Failed to parse JSON:', parseError)
-      return res.status(400).json({ error: 'Invalid JSON' })
-    }
-    
+    // 10. Используем req.body напрямую (уже распарсен Express)
+    const webhookData = req.body
     const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = webhookData
     
     console.log('Atlos webhook received:', { orderId, status, amount, currency })
