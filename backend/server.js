@@ -149,7 +149,7 @@ app.post('/api/webhooks/atlos', express.raw({ type: '*/*' }), (req, res) => {
               // 2) Перевести в completed — ТОЛЬКО если ещё не completed
               db.run(
                 `UPDATE payments
-                 SET status='completed', updated_at=datetime('now')
+                 SET status='completed'
                  WHERE payment_id=? AND status!='completed'`,
                 [orderId],
                 function(err) {
