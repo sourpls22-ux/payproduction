@@ -11,7 +11,7 @@ const TopUp = () => {
   const [selectedQuickAmount, setSelectedQuickAmount] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const { t } = useTranslation()
-  const { error } = useToast()
+  const { error, success, info } = useToast()
   
   // Глобальная обработка ошибок Atlos WebSocket
   useEffect(() => {
@@ -247,14 +247,37 @@ const TopUp = () => {
         
         if (atlosReady) {
           try {
-            console.log('Atlos is ready, calling Atlos.Pay with data:', response.data.payment_data)
+            // Добавляем callback функции для ATLOS
+            const paymentDataWithCallbacks = {
+              ...response.data.payment_data,
+              onSuccess: (data) => {
+                console.log('Payment successful:', data)
+                // Можно добавить редирект или уведомление
+                success('Payment successful!')
+              },
+              onCanceled: (data) => {
+                console.log('Payment canceled:', data)
+                info('Payment canceled')
+              },
+              onCompleted: (data) => {
+                console.log('Payment completed:', data)
+                // Обновить баланс или показать уведомление
+                success('Payment completed successfully!')
+                // Можно добавить обновление баланса
+                setTimeout(() => {
+                  window.location.reload()
+                }, 2000)
+              }
+            }
+            
+            console.log('Atlos is ready, calling Atlos.Pay with data:', paymentDataWithCallbacks)
             
             // Принудительно переподключаемся для стабильности
             await forceAtlosReconnect()
             
             setTimeout(async () => {
               try {
-                await callAtlosWithRetry(response.data.payment_data)
+                await callAtlosWithRetry(paymentDataWithCallbacks)
               } catch (retryError) {
                 console.warn('Atlos widget failed after retries:', retryError)
                 // Fallback to direct URL if Atlos widget fails
