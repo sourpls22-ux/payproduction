@@ -186,9 +186,9 @@ const TopUp = () => {
   // Варианты быстрого пополнения с скидками
   const quickAmounts = [
     { amount: 10, discount: 0, bonus: 0, label: '$10', description: 'No bonus' },
-    { amount: 50, discount: 5, bonus: 2.5, label: '$50', description: '5% bonus' },
-    { amount: 100, discount: 10, bonus: 10, label: '$100', description: '10% bonus' },
-    { amount: 200, discount: 15, bonus: 30, label: '$200', description: '15% bonus' }
+    { amount: 52.5, discount: 5, bonus: 2.5, label: '$52.50', description: '5% bonus' },
+    { amount: 110, discount: 10, bonus: 10, label: '$110', description: '10% bonus' },
+    { amount: 230, discount: 15, bonus: 30, label: '$230', description: '15% bonus' }
   ]
   
   // Только криптовалюта, убираем выбор метода
@@ -340,7 +340,7 @@ const TopUp = () => {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="theme-text font-semibold text-lg">{quickAmounts[0].label}</div>
+                    <div className="theme-text font-semibold text-lg">$10.00</div>
                     <div className="theme-text-secondary text-sm">{quickAmounts[0].description}</div>
                   </div>
                   <div className="text-right">
@@ -350,7 +350,7 @@ const TopUp = () => {
                       </div>
                     )}
                     <div className="theme-text-secondary text-sm">
-                      Pay: ${(quickAmounts[0].amount - quickAmounts[0].bonus).toFixed(2)}
+                      Get: {quickAmounts[0].label}
                     </div>
                   </div>
                 </div>
@@ -381,7 +381,7 @@ const TopUp = () => {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="theme-text font-semibold text-lg">{quickAmounts[1].label}</div>
+                    <div className="theme-text font-semibold text-lg">$50.00</div>
                     <div className="theme-text-secondary text-sm">{quickAmounts[1].description}</div>
                   </div>
                   <div className="text-right">
@@ -391,7 +391,7 @@ const TopUp = () => {
                       </div>
                     )}
                     <div className="theme-text-secondary text-sm">
-                      Pay: ${(quickAmounts[1].amount - quickAmounts[1].bonus).toFixed(2)}
+                      Get: {quickAmounts[1].label}
                     </div>
                   </div>
                 </div>
@@ -423,7 +423,7 @@ const TopUp = () => {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="theme-text font-semibold text-lg">{quickAmounts[2].label}</div>
+                    <div className="theme-text font-semibold text-lg">$100.00</div>
                     <div className="theme-text-secondary text-sm">{quickAmounts[2].description}</div>
                   </div>
                   <div className="text-right">
@@ -433,7 +433,7 @@ const TopUp = () => {
                       </div>
                     )}
                     <div className="theme-text-secondary text-sm">
-                      Pay: ${(quickAmounts[2].amount - quickAmounts[2].bonus).toFixed(2)}
+                      Get: {quickAmounts[2].label}
                     </div>
                   </div>
                 </div>
@@ -464,7 +464,7 @@ const TopUp = () => {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="theme-text font-semibold text-lg">{quickAmounts[3].label}</div>
+                    <div className="theme-text font-semibold text-lg">$200.00</div>
                     <div className="theme-text-secondary text-sm">{quickAmounts[3].description}</div>
                   </div>
                   <div className="text-right">
@@ -474,7 +474,7 @@ const TopUp = () => {
                       </div>
                     )}
                     <div className="theme-text-secondary text-sm">
-                      Pay: ${(quickAmounts[3].amount - quickAmounts[3].bonus).toFixed(2)}
+                      Get: {quickAmounts[3].label}
                     </div>
                   </div>
                 </div>
