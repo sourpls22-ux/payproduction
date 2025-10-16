@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Bitcoin } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useTranslation } from '../hooks/useTranslation'
@@ -11,7 +11,7 @@ const TopUp = () => {
   const [selectedQuickAmount, setSelectedQuickAmount] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const { t } = useTranslation()
-  const { error } = useToast()
+  const { error, success, info } = useToast()
   
   // Глобальная обработка ошибок Atlos WebSocket
   useEffect(() => {
@@ -44,150 +44,29 @@ const TopUp = () => {
     }
   }, [])
   
-  // Функция для ожидания загрузки Atlos
-  const waitForAtlos = () => {
-    return new Promise((resolve) => {
-      if (window.atlos && window.atlos.Pay) {
-        resolve(true)
-      } else {
-        const checkAtlos = setInterval(() => {
-          if (window.atlos && window.atlos.Pay) {
-            clearInterval(checkAtlos)
-            resolve(true)
-          }
-        }, 100)
-        
-        // Таймаут через 5 секунд
-        setTimeout(() => {
-          clearInterval(checkAtlos)
-          resolve(false)
-        }, 5000)
-      }
-    })
+  // Помощник: ждём, пока SDK реально готов
+  const waitForAtlos = (timeoutMs = 15000) => {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const tick = () => {
+        const g = window.Atlos || window.atlos; // поддержка обоих вариантов
+        if (g && (g.Pay || g.pay)) return resolve(g);
+        if (Date.now() - start > timeoutMs) return reject(new Error('ATLOS not ready (timeout)'));
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
   }
 
-  // Функция для проверки состояния WebSocket соединения ATLOS
-  const checkAtlosConnection = () => {
-    return new Promise((resolve) => {
-      if (!window.atlos) {
-        resolve(false)
-        return
-      }
-      
-      // Проверяем различные состояния соединения
-      const checkConnection = () => {
-        try {
-          // Пытаемся получить состояние соединения
-          if (window.atlos._connection && window.atlos._connection.readyState === 1) {
-            console.log('ATLOS WebSocket connection is ready (1)')
-            resolve(true)
-          } else if (window.atlos._ws && window.atlos._ws.readyState === 1) {
-            console.log('ATLOS WebSocket connection is ready (2)')
-            resolve(true)
-          } else if (window.atlos._connection || window.atlos._ws) {
-            console.log('ATLOS WebSocket connection not ready, waiting...')
-            setTimeout(checkConnection, 500)
-          } else {
-            // Если не можем найти объекты соединения, считаем что готово
-            console.log('ATLOS WebSocket objects not found, assuming ready')
-            resolve(true)
-          }
-        } catch (error) {
-          console.warn('Error checking ATLOS connection:', error)
-          resolve(false)
-        }
-      }
-      
-      // Начинаем проверку через 1 секунду
-      setTimeout(checkConnection, 1000)
-      
-      // Таймаут через 10 секунд
-      setTimeout(() => {
-        console.log('ATLOS connection check timeout')
-        resolve(false)
-      }, 10000)
-    })
-  }
   
-  // Функция для вызова Atlos с проверкой соединения
-  const callAtlosWithRetry = (paymentData, retries = 3) => {
-    return new Promise(async (resolve, reject) => {
-      const attemptCall = async (attempt) => {
-        try {
-          if (window.atlos && window.atlos.Pay) {
-            console.log(`Attempting Atlos.Pay (attempt ${attempt + 1}/${retries + 1})`)
-            
-            // Проверяем состояние соединения
-            const isConnected = await checkAtlosConnection()
-            
-            if (isConnected) {
-              try {
-                console.log('ATLOS connection verified, calling Pay method')
-                window.atlos.Pay(paymentData)
-                resolve(true)
-              } catch (innerError) {
-                console.warn(`Atlos.Pay failed (attempt ${attempt + 1}/${retries + 1}):`, innerError)
-                if (attempt < retries) {
-                  setTimeout(() => attemptCall(attempt + 1), 3000) // Увеличиваем задержку
-                } else {
-                  reject(innerError)
-                }
-              }
-            } else {
-              console.warn(`Atlos connection not ready (attempt ${attempt + 1}/${retries + 1})`)
-              if (attempt < retries) {
-                setTimeout(() => attemptCall(attempt + 1), 3000)
-              } else {
-                reject(new Error('Atlos connection not ready after retries'))
-              }
-            }
-          } else {
-            throw new Error('Atlos not available')
-          }
-        } catch (error) {
-          console.warn(`Atlos call failed (attempt ${attempt + 1}/${retries + 1}):`, error)
-          if (attempt < retries) {
-            setTimeout(() => attemptCall(attempt + 1), 3000)
-          } else {
-            reject(error)
-          }
-        }
-      }
-      attemptCall(0)
-    })
-  }
 
-  // Функция для принудительного переподключения ATLOS
-  const forceAtlosReconnect = () => {
-    return new Promise((resolve) => {
-      if (window.atlos && window.atlos._connection) {
-        try {
-          // Закрываем существующее соединение
-          if (window.atlos._connection.close) {
-            window.atlos._connection.close()
-          }
-          if (window.atlos._ws && window.atlos._ws.close) {
-            window.atlos._ws.close()
-          }
-          console.log('ATLOS connection closed for reconnection')
-        } catch (error) {
-          console.warn('Error closing ATLOS connection:', error)
-        }
-      }
-      
-      // Ждем переподключения
-      setTimeout(() => {
-        console.log('ATLOS reconnection delay completed')
-        resolve(true)
-      }, 2000)
-    })
-  }
   
   // Варианты быстрого пополнения с скидками
   const quickAmounts = [
     { amount: 10, discount: 0, bonus: 0, label: '$10', description: 'No bonus' },
-    { amount: 50, discount: 5, bonus: 2.5, label: '$50', description: '5% bonus' },
-    { amount: 100, discount: 10, bonus: 10, label: '$100', description: '10% bonus' }
+    { amount: 52.5, discount: 5, bonus: 2.5, label: '$52.50', description: '5% bonus' },
+    { amount: 110, discount: 10, bonus: 10, label: '$110', description: '10% bonus' },
+    { amount: 230, discount: 15, bonus: 30, label: '$230', description: '15% bonus' }
   ]
   
   // Только криптовалюта, убираем выбор метода
@@ -241,36 +120,44 @@ const TopUp = () => {
         console.log('Payment data received:', response.data.payment_data)
         console.log('Payment URL:', response.data.payment_url)
         
-        // Ждем загрузки Atlos
-        const atlosReady = await waitForAtlos()
+        // Строим URL как раньше
+        const paymentUrl = response.data.payment_url
         
-        if (atlosReady) {
-          try {
-            console.log('Atlos is ready, calling Atlos.Pay with data:', response.data.payment_data)
-            
-            // Принудительно переподключаемся для стабильности
-            await forceAtlosReconnect()
-            
-            setTimeout(async () => {
-              try {
-                await callAtlosWithRetry(response.data.payment_data)
-              } catch (retryError) {
-                console.warn('Atlos widget failed after retries:', retryError)
-                // Fallback to direct URL if Atlos widget fails
-                console.log('Falling back to direct URL:', response.data.payment_url)
-                window.open(response.data.payment_url, '_blank')
-              }
-            }, 3000) // Увеличиваем задержку до 3 секунд
-          } catch (atlosError) {
-            console.warn('Atlos widget error:', atlosError)
-            // Fallback to direct URL if Atlos widget fails
-            console.log('Falling back to direct URL:', response.data.payment_url)
-            window.open(response.data.payment_url, '_blank')
+        // Добавляем callback функции для ATLOS
+        const paymentDataWithCallbacks = {
+          ...response.data.payment_data,
+          onSuccess: (data) => {
+            console.log('Payment successful:', data)
+            success('Payment successful!')
+          },
+          onCanceled: (data) => {
+            console.log('Payment canceled:', data)
+            info('Payment canceled')
+          },
+          onCompleted: (data) => {
+            console.log('Payment completed:', data)
+            success('Payment completed successfully!')
+            setTimeout(() => {
+              window.location.reload()
+            }, 2000)
           }
-        } else {
-          // Fallback to direct URL if Atlos not ready
-          console.log('Atlos not ready after 5 seconds, using direct URL:', response.data.payment_url)
-          window.open(response.data.payment_url, '_blank')
+        }
+
+        try {
+          // если скрипт async — дождёмся его инициализации
+          const atlos = await waitForAtlos(15000);
+
+          // найдём метод оплаты в любом регистре
+          const openPay = atlos.Pay || atlos.pay;
+          if (typeof openPay === 'function') {
+            openPay.call(atlos, paymentDataWithCallbacks); // показать модалку
+          } else {
+            console.warn('[ATLOS] Pay method not found, fallback to URL');
+            window.open(paymentUrl, '_blank', 'noopener');
+          }
+        } catch (e) {
+          console.warn('[ATLOS] Not ready, fallback to direct URL:', e?.message);
+          window.open(paymentUrl, '_blank', 'noopener');
         }
       } else {
         console.error('No payment data received:', response.data)
@@ -279,6 +166,93 @@ const TopUp = () => {
     } catch (err) {
       console.error('Top up error:', err)
       error('Payment creation failed. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Новая функция для тестового платежа с улучшенной диагностикой
+  const handleTestPayment = async () => {
+    if (!amount || amount < 1) {
+      error('Minimum top-up amount: $1')
+      return
+    }
+    
+    setIsProcessing(true)
+    
+    try {
+      const finalAmount = getFinalAmount()
+      
+      console.log('🧪 [TEST PAYMENT] Starting NEW production payment...')
+      console.log('🧪 [TEST PAYMENT] Amount:', finalAmount)
+      console.log('🧪 [TEST PAYMENT] Credit Amount:', parseFloat(amount))
+      
+      // Use NEW production endpoint
+      const response = await axios.post('/api/payments/atlos-new/start', {
+        amount: finalAmount,
+        creditAmount: parseFloat(amount)
+      })
+      
+      console.log('🧪 [TEST PAYMENT] Response received:', response.data)
+      
+      if (response.data.payment_data) {
+        const paymentData = response.data.payment_data
+        console.log('🧪 [TEST PAYMENT] Payment data:', paymentData)
+        console.log('🧪 [TEST PAYMENT] Payment URL:', response.data.payment_url)
+        
+        // Проверяем ATLOS SDK
+        console.log('🧪 [TEST PAYMENT] Checking ATLOS SDK...')
+        console.log('🧪 [TEST PAYMENT] window.Atlos:', window.Atlos)
+        console.log('🧪 [TEST PAYMENT] window.atlos:', window.atlos)
+        
+        // Добавляем расширенные callback'и для диагностики
+        const paymentDataWithCallbacks = {
+          ...paymentData,
+          onSuccess: (data) => {
+            console.log('🧪 [TEST PAYMENT] ✅ Success callback triggered:', data)
+            success('Test payment successful!')
+          },
+          onCanceled: (data) => {
+            console.log('🧪 [TEST PAYMENT] ❌ Canceled callback triggered:', data)
+            info('Test payment canceled')
+          },
+          onCompleted: (data) => {
+            console.log('🧪 [TEST PAYMENT] ✅ Completed callback triggered:', data)
+            success('Test payment completed successfully!')
+            setTimeout(() => {
+              window.location.reload()
+            }, 2000)
+          },
+          onError: (data) => {
+            console.log('🧪 [TEST PAYMENT] ❌ Error callback triggered:', data)
+            error('Test payment error: ' + JSON.stringify(data))
+          }
+        }
+
+        try {
+          console.log('🧪 [TEST PAYMENT] Waiting for ATLOS SDK...')
+          const atlos = await waitForAtlos(15000)
+          console.log('🧪 [TEST PAYMENT] ATLOS SDK ready:', atlos)
+
+          const openPay = atlos.Pay || atlos.pay
+          if (typeof openPay === 'function') {
+            console.log('🧪 [TEST PAYMENT] Calling ATLOS Pay method...')
+            openPay.call(atlos, paymentDataWithCallbacks)
+          } else {
+            console.warn('🧪 [TEST PAYMENT] Pay method not found, fallback to URL')
+            window.open(response.data.payment_url, '_blank', 'noopener')
+          }
+        } catch (e) {
+          console.warn('🧪 [TEST PAYMENT] ATLOS not ready, fallback to direct URL:', e?.message)
+          window.open(response.data.payment_url, '_blank', 'noopener')
+        }
+      } else {
+        console.error('🧪 [TEST PAYMENT] No payment data received:', response.data)
+        error('Test payment data not received. Please try again.')
+      }
+    } catch (err) {
+      console.error('🧪 [TEST PAYMENT] Error:', err)
+      error('Test payment creation failed: ' + err.message)
     } finally {
       setIsProcessing(false)
     }
@@ -294,7 +268,7 @@ const TopUp = () => {
     <>
       <SEOHead {...seoData} />
       <div className="min-h-screen theme-bg py-8">
-      <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-8">
               <Link
                 to="/dashboard"
@@ -308,55 +282,176 @@ const TopUp = () => {
             </div>
 
         <div className="theme-surface rounded-lg p-6 border theme-border">
-              {/* Способ оплаты - только криптовалюта */}
-              <div className="mb-6">
-                <h3 className="theme-text font-semibold mb-4">{t('topUp.paymentMethod')}</h3>
-                <div className="p-4 rounded-lg border-2 border-onlyfans-accent bg-blue-500 bg-opacity-10">
-                  <div className="flex items-center space-x-3">
-                    <Bitcoin size={24} className="text-onlyfans-accent" />
-                    <div className="text-left">
-                      <div className="theme-text font-semibold">{t('topUp.usdtTron')}</div>
-                      <div className="theme-text-secondary text-sm">{t('topUp.fastAnonymous')}</div>
-                    </div>
-                  </div>
-                </div>
-                <p className="theme-text-secondary text-sm mt-2">
-                  {t('topUp.cryptoOnly')}
-                </p>
-              </div>
 
           {/* Быстрое пополнение */}
           <div className="mb-6">
             <h3 className="theme-text font-semibold mb-4">Quick Top-Up</h3>
-            <div className="grid grid-cols-1 gap-3">
-              {quickAmounts.map((quickAmount) => (
-                <button
-                  key={quickAmount.amount}
-                  onClick={() => handleQuickAmountSelect(quickAmount)}
-                  className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    selectedQuickAmount?.amount === quickAmount.amount
-                      ? 'border-onlyfans-accent bg-blue-500 bg-opacity-10'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-onlyfans-accent hover:bg-blue-500 hover:bg-opacity-5'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="theme-text font-semibold text-lg">{quickAmount.label}</div>
-                      <div className="theme-text-secondary text-sm">{quickAmount.description}</div>
-                    </div>
-                    <div className="text-right">
-                      {quickAmount.bonus > 0 && (
-                        <div className="text-green-500 font-semibold text-sm">
-                          +${quickAmount.bonus} bonus
-                        </div>
-                      )}
-                      <div className="theme-text-secondary text-sm">
-                        Pay: ${(quickAmount.amount - quickAmount.bonus).toFixed(2)}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Первый ряд: $10 и $50 */}
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[0])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[0].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[0].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[0].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[0].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">$10.00</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[0].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[0].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[0].bonus} bonus
                       </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Get: {quickAmounts[0].label}
                     </div>
                   </div>
-                </button>
-              ))}
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[1])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[1].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[1].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[1].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[1].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">$50.00</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[1].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[1].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[1].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Get: {quickAmounts[1].label}
+                    </div>
+                  </div>
+                </div>
+              </button>
+              
+              {/* Второй ряд: $100 и $200 */}
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[2])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[2].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[2].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[2].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[2].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">$100.00</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[2].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[2].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[2].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Get: {quickAmounts[2].label}
+                    </div>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleQuickAmountSelect(quickAmounts[3])}
+                className={`p-5 rounded-lg transition-all text-left ${
+                  selectedQuickAmount?.amount === quickAmounts[3].amount
+                    ? 'bg-blue-500 bg-opacity-10'
+                    : 'hover:bg-blue-500 hover:bg-opacity-5'
+                }`}
+                style={{
+                  border: selectedQuickAmount?.amount === quickAmounts[3].amount 
+                    ? '2px solid #3b82f6' 
+                    : '2px solid #6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[3].amount) {
+                    e.target.style.borderColor = '#3b82f6'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuickAmount?.amount !== quickAmounts[3].amount) {
+                    e.target.style.borderColor = '#6b7280'
+                  }
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="theme-text font-semibold text-lg">$200.00</div>
+                    <div className="theme-text-secondary text-sm">{quickAmounts[3].description}</div>
+                  </div>
+                  <div className="text-right">
+                    {quickAmounts[3].bonus > 0 && (
+                      <div className="text-green-500 font-semibold text-sm">
+                        +${quickAmounts[3].bonus} bonus
+                      </div>
+                    )}
+                    <div className="theme-text-secondary text-sm">
+                      Get: {quickAmounts[3].label}
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -405,21 +500,42 @@ const TopUp = () => {
             </div>
           </div>
 
-              {/* Кнопка пополнения */}
-              <button
-                onClick={handleTopUp}
-                disabled={!amount || amount < 1 || isProcessing}
-                className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
-                  </>
-                ) : (
-                  t('topUp.topUpButton')
+              {/* Кнопки пополнения */}
+              <div className="space-y-3">
+                {/* Основная кнопка */}
+                <button
+                  onClick={handleTopUp}
+                  disabled={!amount || amount < 1 || isProcessing}
+                  className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    t('topUp.topUpButton')
+                  )}
+                </button>
+
+                {/* Новая тестовая кнопка - только в development */}
+                {process.env.NODE_ENV === 'development' && (
+                  <button
+                    onClick={handleTestPayment}
+                    disabled={!amount || amount < 1 || isProcessing}
+                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Testing...
+                      </>
+                    ) : (
+                      '🧪 Test Payment (New System)'
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
 
               {/* Дополнительная информация */}
               <div className="mt-6 text-center">
