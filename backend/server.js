@@ -94,11 +94,14 @@ app.post('/api/webhooks/atlos', express.raw({ type: '*/*' }), (req, res) => {
 
     // Diagnostic logs
     const key = Buffer.from(sec, 'base64');
+    const raw = req.body; // Buffer
     console.log('[ATLOS] Key debug', {
       base64Len: sec.length,
       decodedLen: key.length,
       head4: key.slice(0,4).toString('base64')
     });
+    console.log('[ATLOS] raw len/sha256', raw.length,
+      crypto.createHash('sha256').update(raw).digest('hex'));
 
     // HMAC calculation
     const expected = crypto.createHmac('sha256', key).update(req.body).digest('base64');
@@ -114,16 +117,19 @@ app.post('/api/webhooks/atlos', express.raw({ type: '*/*' }), (req, res) => {
     console.log('[ATLOS] Signature OK');
 
     // Parse JSON after verification
-    let event;
-    try { 
-      event = JSON.parse(req.body.toString('utf8')); 
+    let evt;
+    try {
+      evt = JSON.parse(req.body.toString('utf8'));
     } catch (e) {
-      console.error('[ATLOS] Failed to parse JSON:', e);
-      return res.status(400).send('invalid json');
+      console.error('[ATLOS] JSON parse error', e);
+      return res.status(200).json({ ok: true });
     }
 
-    // Process webhook event
-    const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = event;
+    // Process webhook event with correct field names from ATLOS
+    const orderId  = evt.OrderId;
+    const status   = evt.Status;                      // 100 = успешный
+    const amount   = evt.PaidAmount ?? evt.Amount;
+    const currency = evt.OrderCurrency;
     
     console.log('[ATLOS] Webhook received:', { orderId, status, amount, currency });
     
