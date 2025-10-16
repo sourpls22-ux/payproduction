@@ -1,3 +1,4 @@
+import dotenv from 'dotenv'
 import express from 'express'
 import cors from 'cors'
 import compression from 'compression'
@@ -8,12 +9,12 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+
+// Load environment variables first
+dotenv.config({ path: './.env' })
 import sharp from 'sharp'
-import dotenv from 'dotenv'
 import axios from 'axios'
 import crypto from 'crypto'
-
-dotenv.config()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -48,6 +49,13 @@ const verifyTurnstileToken = async (token) => {
 const app = express()
 const PORT = process.env.PORT || 5000
 
+// Diagnostic log for ATLOS key at startup
+console.log('[ATLOS] Server start key debug', {
+  base64Len: (process.env.ATLOS_API_SECRET || '').length,
+  decodedLen: Buffer.from(process.env.ATLOS_API_SECRET || '', 'base64').length,
+  head4: Buffer.from(process.env.ATLOS_API_SECRET || '', 'base64').slice(0,4).toString('base64')
+});
+
 // CORS configuration
 const corsOptions = process.env.NODE_ENV === 'production' 
   ? {
@@ -76,52 +84,45 @@ app.use(cors(corsOptions))
 // ATLOS Webhook handler - MUST be before express.json() to get raw body
 app.post('/api/webhooks/atlos', express.raw({ type: '*/*' }), (req, res) => {
   try {
-    const sigHeader = req.get('signature');
-    const apiSecretB64 = process.env.ATLOS_API_SECRET;
-
-    if (!sigHeader || !apiSecretB64) {
+    const sig = req.get('signature');
+    const sec = process.env.ATLOS_API_SECRET || '';
+    
+    if (!sig || !sec) {
       console.error('[ATLOS] missing signature or secret');
       return res.status(400).send('bad request');
     }
 
-    // 1) raw bytes exactly as received
-    const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body) || '', 'utf8');
+    // Diagnostic logs
+    const key = Buffer.from(sec, 'base64');
+    console.log('[ATLOS] Key debug', {
+      base64Len: sec.length,
+      decodedLen: key.length,
+      head4: key.slice(0,4).toString('base64')
+    });
 
-    // 2) base64-decode key
-    let key;
-    try {
-      key = Buffer.from(apiSecretB64, 'base64');
-      if (key.length === 0) throw new Error('empty decoded key');
-    } catch (e) {
-      console.error('[ATLOS] API secret is not valid base64');
-      return res.status(500).send('server misconfigured');
-    }
+    // HMAC calculation
+    const expected = crypto.createHmac('sha256', key).update(req.body).digest('base64');
 
-    // 3) HMAC over raw bytes → base64
-    const expected = crypto.createHmac('sha256', key).update(rawBuf).digest('base64');
-
-    // 4) constant-time compare
-    const a = Buffer.from(sigHeader);
+    // Timing-safe comparison
+    const a = Buffer.from(sig);
     const b = Buffer.from(expected);
-    const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
-
-    if (!ok) {
-      console.error('[ATLOS] Invalid signature', { received: sigHeader, expected });
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      console.error('[ATLOS] Invalid signature', { received: sig, expected });
       return res.status(400).send('invalid signature');
     }
 
     console.log('[ATLOS] Signature OK');
 
-    // 5) Safely parse JSON AFTER verification
+    // Parse JSON after verification
     let event;
     try { 
-      event = JSON.parse(rawBuf.toString('utf8')); 
+      event = JSON.parse(req.body.toString('utf8')); 
     } catch (e) {
       console.error('[ATLOS] Failed to parse JSON:', e);
       return res.status(400).send('invalid json');
     }
 
-    // 6) Process the webhook event
+    // Process webhook event
     const { OrderId: orderId, Status: status, Amount: amount, OrderCurrency: currency } = event;
     
     console.log('[ATLOS] Webhook received:', { orderId, status, amount, currency });
