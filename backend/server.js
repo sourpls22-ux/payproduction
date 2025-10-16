@@ -2312,10 +2312,5 @@ app.listen(PORT, () => {
   console.log('Auto-renewal system started - checking every hour')
   
   // Start WebSocket watcher for real-time payment updates
-  try {
-    const { startAtlosWatcher } = await import('./atlos-ws.js');
-    startAtlosWatcher();
-  } catch (e) {
-    console.error('[ATLOS:WS] disabled:', e?.message || e);
-  }
+  startAtlosWatcher();
 })
