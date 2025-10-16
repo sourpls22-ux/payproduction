@@ -7,7 +7,14 @@ export function startAtlosWatcher() {
   ws.on("open", () => console.log("[ATLOS:WS] connected"));
   ws.on("message", async (data) => {
     try {
-      const msg = JSON.parse(data.toString());
+      const text = data.toString();
+      // Проверяем, что это JSON
+      if (!text.startsWith('{') && !text.startsWith('[')) {
+        console.log('[ATLOS:WS] non-JSON message:', text);
+        return;
+      }
+      
+      const msg = JSON.parse(text);
       if (msg?.type === "payment:update" && msg?.data?.orderId) {
         console.log("[ATLOS:WS] payment:update", msg.data);
         // Триггерим локальный ресинк
