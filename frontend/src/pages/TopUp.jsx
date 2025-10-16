@@ -171,6 +171,93 @@ const TopUp = () => {
     }
   }
 
+  // Новая функция для тестового платежа с улучшенной диагностикой
+  const handleTestPayment = async () => {
+    if (!amount || amount < 1) {
+      error('Minimum top-up amount: $1')
+      return
+    }
+    
+    setIsProcessing(true)
+    
+    try {
+      const finalAmount = getFinalAmount()
+      
+      console.log('🧪 [TEST PAYMENT] Starting NEW production payment...')
+      console.log('🧪 [TEST PAYMENT] Amount:', finalAmount)
+      console.log('🧪 [TEST PAYMENT] Credit Amount:', parseFloat(amount))
+      
+      // Use NEW production endpoint
+      const response = await axios.post('/api/payments/atlos-new/start', {
+        amount: finalAmount,
+        creditAmount: parseFloat(amount)
+      })
+      
+      console.log('🧪 [TEST PAYMENT] Response received:', response.data)
+      
+      if (response.data.payment_data) {
+        const paymentData = response.data.payment_data
+        console.log('🧪 [TEST PAYMENT] Payment data:', paymentData)
+        console.log('🧪 [TEST PAYMENT] Payment URL:', response.data.payment_url)
+        
+        // Проверяем ATLOS SDK
+        console.log('🧪 [TEST PAYMENT] Checking ATLOS SDK...')
+        console.log('🧪 [TEST PAYMENT] window.Atlos:', window.Atlos)
+        console.log('🧪 [TEST PAYMENT] window.atlos:', window.atlos)
+        
+        // Добавляем расширенные callback'и для диагностики
+        const paymentDataWithCallbacks = {
+          ...paymentData,
+          onSuccess: (data) => {
+            console.log('🧪 [TEST PAYMENT] ✅ Success callback triggered:', data)
+            success('Test payment successful!')
+          },
+          onCanceled: (data) => {
+            console.log('🧪 [TEST PAYMENT] ❌ Canceled callback triggered:', data)
+            info('Test payment canceled')
+          },
+          onCompleted: (data) => {
+            console.log('🧪 [TEST PAYMENT] ✅ Completed callback triggered:', data)
+            success('Test payment completed successfully!')
+            setTimeout(() => {
+              window.location.reload()
+            }, 2000)
+          },
+          onError: (data) => {
+            console.log('🧪 [TEST PAYMENT] ❌ Error callback triggered:', data)
+            error('Test payment error: ' + JSON.stringify(data))
+          }
+        }
+
+        try {
+          console.log('🧪 [TEST PAYMENT] Waiting for ATLOS SDK...')
+          const atlos = await waitForAtlos(15000)
+          console.log('🧪 [TEST PAYMENT] ATLOS SDK ready:', atlos)
+
+          const openPay = atlos.Pay || atlos.pay
+          if (typeof openPay === 'function') {
+            console.log('🧪 [TEST PAYMENT] Calling ATLOS Pay method...')
+            openPay.call(atlos, paymentDataWithCallbacks)
+          } else {
+            console.warn('🧪 [TEST PAYMENT] Pay method not found, fallback to URL')
+            window.open(response.data.payment_url, '_blank', 'noopener')
+          }
+        } catch (e) {
+          console.warn('🧪 [TEST PAYMENT] ATLOS not ready, fallback to direct URL:', e?.message)
+          window.open(response.data.payment_url, '_blank', 'noopener')
+        }
+      } else {
+        console.error('🧪 [TEST PAYMENT] No payment data received:', response.data)
+        error('Test payment data not received. Please try again.')
+      }
+    } catch (err) {
+      console.error('🧪 [TEST PAYMENT] Error:', err)
+      error('Test payment creation failed: ' + err.message)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const seoData = {
     title: t('topUp.title'),
     description: t('topUp.subtitle'),
@@ -413,21 +500,42 @@ const TopUp = () => {
             </div>
           </div>
 
-              {/* Кнопка пополнения */}
-              <button
-                onClick={handleTopUp}
-                disabled={!amount || amount < 1 || isProcessing}
-                className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
-                  </>
-                ) : (
-                  t('topUp.topUpButton')
+              {/* Кнопки пополнения */}
+              <div className="space-y-3">
+                {/* Основная кнопка */}
+                <button
+                  onClick={handleTopUp}
+                  disabled={!amount || amount < 1 || isProcessing}
+                  className="w-full bg-onlyfans-accent text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    t('topUp.topUpButton')
+                  )}
+                </button>
+
+                {/* Новая тестовая кнопка - только в development */}
+                {process.env.NODE_ENV === 'development' && (
+                  <button
+                    onClick={handleTestPayment}
+                    disabled={!amount || amount < 1 || isProcessing}
+                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:opacity-80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Testing...
+                      </>
+                    ) : (
+                      '🧪 Test Payment (New System)'
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
 
               {/* Дополнительная информация */}
               <div className="mt-6 text-center">
